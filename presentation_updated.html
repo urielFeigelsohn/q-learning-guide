@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Learning Guide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony (Off-white, Slate, Muted Teal/Blue) -->
+    <!-- Application Structure Plan: A multi-section, single-page application with a sticky side navigation. This structure provides a guided, linear path for learners while allowing experts to jump directly to sections of interest. The centerpiece is a fully interactive simulation of the fraud detection scenario, which moves beyond static text to provide a hands-on learning experience. This design prioritizes understanding and exploration over a simple presentation of information, making complex concepts more tangible. -->
+    <!-- Visualization & Content Choices: Report concepts are broken into interactive components. Hyperparameters are controlled by sliders for immediate feedback on their function (Goal: Inform, Method: HTML/JS). The core algorithm is demonstrated through a dynamic HTML table and a final results bar chart via Chart.js, not static images (Goal: Change/Simulate, Method: HTML/JS/Chart.js). Comparisons and pros/cons use clear, structured HTML layouts for readability (Goal: Compare, Method: HTML/CSS). All diagrams are built with Tailwind's layout utilities, ensuring responsiveness and avoiding static, non-interactive graphics. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+            color: #334155; /* slate-700 */
+        }
+        .nav-link {
+            transition: all 0.2s ease-in-out;
+            border-left: 3px solid transparent;
+        }
+        .nav-link.active, .nav-link:hover {
+            color: #0d9488; /* teal-600 */
+            border-left-color: #0d9488;
+            transform: translateX(4px);
+        }
+        .content-card {
+            background-color: white;
+            border-radius: 0.75rem;
+            border: 1px solid #e2e8f0; /* slate-200 */
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            transition: all 0.3s ease;
+        }
+        .content-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.07);
+        }
+        .sim-table td, .sim-table th {
+            padding: 0.5rem 0.75rem;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+        .sim-table th {
+            background-color: #f1f5f9; /* slate-100 */
+        }
+        .highlight-update {
+            animation: flash-green 0.7s ease-out;
+        }
+        @keyframes flash-green {
+            0% { background-color: #ccfbf1; } /* teal-100 */
+            100% { background-color: white; }
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 40vh;
+        }
+        /* LaTeX styling */
+        .latex-formula {
+            display: block;
+            text-align: center;
+            font-size: 1.5em; /* Increased font size for readability */
+            margin: 1em 0;
+            overflow-x: auto; /* Allow horizontal scrolling for long formulas */
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="relative min-h-screen md:flex">
+        <!-- Sidebar -->
+        <aside class="sticky top-0 h-screen bg-white shadow-md w-64 hidden md:block">
+            <div class="p-6">
+                <h1 class="text-xl font-bold text-teal-700">Q-Learning Guide</h1>
+                <p class="text-xs text-slate-500">For Fraud Detection</p>
+            </div>
+            <nav class="flex flex-col p-4 space-y-2">
+                <a href="#introduction" class="nav-link px-4 py-2 text-slate-600 font-medium">Introduction</a>
+                <a href="#q-learning-overview" class="nav-link px-4 py-2 text-slate-600 font-medium">Q-Learning Overview</a>
+                <a href="#what-is-q-learning" class="nav-link px-4 py-2 text-slate-600 font-medium">What is Q-Learning?</a>
+                <a href="#q-learning-pros-cons" class="nav-link px-4 py-2 text-slate-600 font-medium">Pros & Cons</a>
+                <a href="#application" class="nav-link px-4 py-2 text-slate-600 font-medium">Fraud Detection App</a>
+                <a href="#algorithm" class="nav-link px-4 py-2 text-slate-600 font-medium">The Algorithm</a>
+                <a href="#simulation" class="nav-link px-4 py-2 text-slate-600 font-medium">Interactive Simulation</a>
+                <a href="#fraud-specific-considerations" class="nav-link px-4 py-2 text-slate-600 font-medium">Fraud Considerations</a>
+                <a href="#evaluation" class="nav-link px-4 py-2 text-slate-600 font-medium">Evaluation Metrics</a>
+                <a href="#deployment-challenges" class="nav-link px-4 py-2 text-slate-600 font-medium">Deployment Challenges</a>
+                <a href="#comparison" class="nav-link px-4 py-2 text-slate-600 font-medium">Algorithm Comparison</a>
+                <a href="#dqn" class="nav-link px-4 py-2 text-slate-600 font-medium">Deep Q-Networks (DQN)</a>
+                <a href="#hybrid-approaches" class="nav-link px-4 py-2 text-slate-600 font-medium">Hybrid Approaches</a>
+                <a href="#cases" class="nav-link px-4 py-2 text-slate-600 font-medium">Real-World Cases</a>
+            </nav>
+        </aside>
+
+        <!-- Main content -->
+        <main class="flex-1 p-4 md:p-10">
+            
+            <!-- Header for mobile -->
+            <div class="md:hidden mb-6 p-4 bg-white rounded-lg shadow">
+                 <h1 class="text-xl font-bold text-teal-700">Q-Learning Guide</h1>
+                 <p class="text-xs text-slate-500">For Fraud Detection</p>
+            </div>
+
+            <!-- Introduction -->
+            <section id="introduction" class="mb-16">
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">Q-Learning Guide</h2>
+                <p class="text-lg text-slate-600 mb-8">Core principles of Q-Learning solving a simplified fraud detection problem.</p>
+                <div class="flex flex-col gap-6">
+                    <div class="content-card p-6">
+                        <h3 class="font-bold text-lg text-teal-700 mb-2">What is Reinforcement Learning?</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li>An area of machine learning focused on sequential decision-making.</li>
+                            <li>An intelligent "agent" learns optimal actions through trial and error.</li>
+                            <li>The goal is to maximize cumulative reward by interacting with an "environment."</li>
+                        </ul>
+                    </div>
+                    <div class="content-card p-6">
+                        <h3 class="font-bold text-lg text-teal-700 mb-2">Why Q-Learning?</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li>It's a foundational and robust RL algorithm.</li>
+                            <li><strong class="font-semibold">Model-Free:</strong> Learns without needing a pre-existing model of the environment.</li>
+                            <li><strong class="font-semibold">Off-Policy:</strong> Can learn the optimal policy independently of its current exploration strategy.</li>
+                            <li>Highly adaptable to dynamic environments.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            
+            <hr class="my-12 border-slate-200">
+
+            <!-- Q-Learning Overview Image -->
+            <section id="q-learning-overview" class="mb-16">
+                <h2 class="text-3xl font-bold text-slate-800 mb-8 text-center">Q-Learning Overview</h2>
+                <div class="flex justify-center items-center content-card p-6">
+                    <img src="https://blog.mlq.ai/content/images/2019/07/deep-q-learning.png" alt="Deep Q-Learning Diagram" class="rounded-lg shadow-lg max-w-full h-auto" onerror="this.onerror=null; this.src='https://placehold.co/600x400/E0F2F7/0D9488?text=Image+Not+Available';">
+                </div>
+            </section>
+
+            <!-- What is Q-Learning? -->
+            <section id="what-is-q-learning" class="mb-16">
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">What is Q-Learning?</h2>
+                <p class="text-lg text-slate-600 mb-8">Q-Learning is a specific type of Reinforcement Learning algorithm that helps an agent learn the best actions to take in different situations without needing to understand the full dynamics of its environment. Think of it as a process of continuous trial and error, where the agent gradually builds a "cheat sheet" (the Q-Table) that tells it how good each action is in every possible scenario.</p>
+                <div class="content-card p-6">
+                    <h3 class="font-bold text-lg text-teal-700 mb-2">The Core Idea: Q-Values</h3>
+                    <p class="mb-4">At its heart, Q-Learning is about learning "Q-values." A Q-value for a given (state, action) pair represents the expected future reward if you take that action in that state, and then continue to act optimally afterwards. The agent's goal is to learn these Q-values for all possible state-action pairs, allowing it to always choose the action that maximizes its long-term reward.</p>
+                    <p class="text-sm text-slate-500">In Reinforcement Learning, data is often **not independent and identically distributed (non-IID)**. This means that sequential decisions and their outcomes are highly dependent on previous actions and states. Therefore, we rely on concepts like states, actions, rewards, and policies to model this sequential dependency and learn optimal long-term strategies, rather than treating each data point independently.</p>
+                </div>
+            </section>
+
+            <hr class="my-12 border-slate-200">
+
+            <!-- Pros and Cons of Q-Learning -->
+            <section id="q-learning-pros-cons" class="mb-16">
+                <h2 class="text-3xl font-bold text-slate-800 mb-8">Pros and Cons of Q-Learning</h2>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="content-card p-6">
+                        <h3 class="font-bold text-lg text-teal-700 mb-2">General Advantages</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong class="font-semibold">Model-Free:</strong> No need for a predefined model of the environment, making it applicable to complex, unknown systems.</li>
+                            <li><strong class="font-semibold">Off-Policy Learning:</strong> Can learn the optimal policy even while following an exploratory or sub-optimal behavior policy, improving data efficiency.</li>
+                            <li><strong class="font-semibold">Handles Delayed Rewards:</strong> Effective in scenarios where rewards are not immediate but occur after a sequence of actions.</li>
+                            <li><strong class="font-semibold">Simplicity:</strong> Conceptually straightforward and relatively easy to implement for small state spaces.</li>
+                        </ul>
+                    </div>
+                    <div class="content-card p-6">
+                        <h3 class="font-bold text-lg text-teal-700 mb-2">General Disadvantages</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong class="font-semibold">Curse of Dimensionality:</strong> Struggles with large or continuous state/action spaces as the Q-table grows exponentially, becoming computationally expensive and memory-intensive.</li>
+                            <li><strong class="font-semibold">Slow Convergence:</strong> Can take a very long time to converge to an optimal policy in complex environments, especially with sparse rewards.</li>
+                            <li><strong class="font-semibold">Hyperparameter Sensitivity:</strong> Performance is highly dependent on the careful tuning of learning rate, discount factor, and exploration rate.</li>
+                            <li><strong class="font-semibold">Exploration Challenges:</strong> May get stuck in local optima if exploration is insufficient, missing better strategies.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <hr class="my-12 border-slate-200">
+
+            <!-- Application -->
+            <section id="application" class="mb-16">
+                 <h2 class="text-3xl font-bold text-slate-800 mb-2">Mapping RL to Customer Fraud Detection</h2>
+                 <p class="text-lg text-slate-600 mb-8">Here's how the abstract concepts of Reinforcement Learning are applied to the concrete problem of detecting fraudulent customers.</p>
+                <div class="grid md:grid-cols-3 gap-6 text-center content-card p-8">
+                     <div class="flex flex-col items-center">
+                         <div class="p-4 bg-teal-100 text-teal-700 rounded-full mb-2">&#x1F9E0;</div>
+                         <h4 class="font-bold">Customer State</h4>
+                         <p class="text-sm">Features like approved/rejected transaction counts, fraud score, payment history, and risk score.</p>
+                     </div>
+                     <div class="flex flex-col items-center text-3xl font-thin text-slate-300 self-center">&#10230;</div>
+                     <div class="flex flex-col items-center">
+                         <div class="p-4 bg-teal-100 text-teal-700 rounded-full mb-2">&#x1F5B2;</div>
+                         <h4 class="font-bold">Action</h4>
+                         <p class="text-sm">The decision: Approve customer for next day, or Deny customer for next day.</p>
+                     </div>
+                     <div class="flex flex-col items-center text-3xl font-thin text-slate-300 self-center">&#10230;</div>
+                     <div class="flex flex-col items-center">
+                         <div class="p-4 bg-teal-100 text-teal-700 rounded-full mb-2">&#x1F3C5;</div>
+                         <h4 class="font-bold">Reward / Penalty</h4>
+                         <p class="text-sm">Financial impact: prevented fraud, lost legitimate business, or continued legitimate business.</p>
+                     </div>
+                 </div>
+            </section>
+            
+            <hr class="my-12 border-slate-200">
+
+            <!-- The Algorithm -->
+            <section id="algorithm" class="mb-16">
+                <h2 class="text-3xl font-bold text-slate-800 mb-8">The Q-Learning Algorithm</h2>
+                <div class="flex justify-center items-center content-card p-6 mb-8">
+                    <img src="https://miro.medium.com/v2/resize:fit:720/format:webp/0*ZC1PGJlwSfruMxTw.png" alt="Q-Table Structure and Q-Learning Update Rule Diagram" class="rounded-lg shadow-lg max-w-full h-auto" onerror="this.onerror=null; this.src='https://placehold.co/600x400/E0F2F7/0D9488?text=Image+Not+Available';">
+                </div>
+                <div class="content-card p-6 mb-8">
+                    <h3 class="text-xl font-semibold mb-4">The Q-Function (Expected Return)</h3>
+                    <p class="text-slate-600 mb-4">The Q-function, $Q(s,a)$, represents the expected cumulative discounted future reward when starting in state $s$, taking action $a$, and then following an optimal policy thereafter. It's formally defined as:</p>
+                    <p class="latex-formula">
+                        $$Q_t = E[G_t | s_t = s, a_t = a] = E[\sum_{k=0}^{T} \gamma^k R_{t+k+1} | s_t = s, a_t = a]$$
+                    </p>
+                    <p class="text-slate-600 mb-4">Where $G_t$ is the return (total discounted future reward) from time $t$, $R$ is the reward, and $\gamma$ is the discount factor. This formula emphasizes the long-term perspective of Q-learning.</p>
+                </div>
+                 <div class="flex justify-center items-center content-card p-6 mb-8">
+                    <img src="https://bpb-us-e1.wpmucdn.com/sites.gatech.edu/dist/d/958/files/2020/12/Q-Value_Iteration.png" alt="Q-Value Iteration Algorithm" class="rounded-lg shadow-lg max-w-full h-auto" onerror="this.onerror=null; this.src='https://placehold.co/600x400/E0F2F7/0D9488?text=Algorithm+Image+Not+Available';">
+                </div>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-xl font-semibold mb-4">The Q-Value Update Rule</h3>
+                        <div class="content-card p-6 mb-6">
+                            <p class="text-center text-lg font-mono bg-slate-100 p-4 rounded-md">Q(s, a) &larr; Q(s, a) + &alpha; [r + &gamma; max Q(s', a') - Q(s, a)]</p>
+                        </div>
+                        <p class="mb-4">This is the heart of Q-Learning. It updates the "quality" (Q-value) of taking an <span class="font-semibold text-teal-600">action (a)</span> in a given <span class="font-semibold text-teal-600">state (s)</span> based on the <span class="font-semibold text-teal-600">reward (r)</span> received and the maximum expected future reward from the <span class="font-semibold text-teal-600">next state (s')</span>. Adjust the sliders to see how each hyperparameter influences this process.</p>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold mb-4">Interactive Hyperparameters</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <label for="alpha" class="font-medium">Learning Rate (&alpha;): <span id="alphaValue" class="font-bold text-teal-600">0.1</span></label>
+                                <input type="range" id="alpha" min="0" max="1" step="0.1" value="0.1" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                <p id="alphaDescription" class="text-sm text-slate-500 mt-1">A low value means the agent learns slowly, trusting old information more.</p>
+                            </div>
+                            <div>
+                                <label for="gamma" class="font-medium">Discount Factor (&gamma;): <span id="gammaValue" class="font-bold text-teal-600">0.1</span></label>
+                                <input type="range" id="gamma" min="0" max="1" step="0.1" value="0.1" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                <p id="gammaDescription" class="text-sm text-slate-500 mt-1">A low value makes the agent "myopic" (only considers immediate rewards).</p>
+                            </div>
+                            <div>
+                                <label for="epsilon" class="font-medium">Exploration Rate (&epsilon;): <span id="epsilonValue" class="font-bold text-teal-600">0.1</span></label>
+                                <input type="range" id="epsilon" min="0" max="1" step="0.1" value="0.1" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                <p id="epsilonDescription" class="text-sm text-slate-500 mt-1">A low value means the agent will mostly exploit known actions, with little exploration.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <hr class="my-12 border-slate-200">
+
+            <!-- Interactive Simulation -->
+            <section id="simulation" class="mb-16">
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">Interactive Customer Fraud Detection Simulation</h2>
+                <p class="text-lg text-slate-600 mb-8">This simulation models a simplified customer fraud detection scenario. For each customer, the agent decides whether to `Approve` their activity for the next day or `Deny` it. Run the simulation to watch the Q-Table update and see how the agent learns the optimal policy for different customer profiles.</p>
+                
+                <div class="grid lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2">
+                        <div class="content-card p-6 mb-4">
+                            <h3 class="text-xl font-semibold mb-3">Understanding Customer States</h3>
+                            <p class="text-sm text-slate-600 mb-2">Each customer state is a combination of four features, indicating their recent activity and risk profile:</p>
+                            <ul class="list-disc list-inside text-sm text-slate-600 space-y-1">
+                                <li><strong>Appr:</strong> Number of transactions approved yesterday. `Low` (e.g., &lt;5), `High` (e.g., &ge;5).</li>
+                                <li><strong>Rej:</strong> Whether the customer had rejected transactions yesterday. `No`, `Yes`.</li>
+                                <li><strong>FS:</strong> Customer's overall fraud score. `Low`, `High`.</li>
+                                <li><strong>Risk:</strong> An aggregated risk assessment of the customer. `Low`, `High`.</li>
+                            </ul>
+                            <p class="text-sm text-slate-500 mt-2">For example, <span class="font-mono">Appr:High,Rej:Yes,FS:High,Risk:High</span> represents a customer with high approved transactions, but also rejected transactions, a high fraud score, and a high overall risk.</p>
+                        </div>
+                        <div class="content-card p-6">
+                            <h3 class="text-xl font-semibold mb-4 text-center">Q-Table: Customer State-Action Values</h3>
+                            <div class="overflow-x-auto">
+                                <table id="qTable" class="w-full text-sm sim-table">
+                                    <thead>
+                                        <tr><th>Customer State</th><th>Q(Approve)</th><th>Q(Deny)</th><th>Learned Policy</th></tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="content-card p-6">
+                             <h3 class="text-xl font-semibold mb-4">Simulation Controls</h3>
+                            <div class="space-y-4 mb-6">
+                                <button id="runStep" class="w-full bg-teal-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-700 transition">Run 1 Customer Decision</button>
+                                <button id="run100" class="w-full bg-sky-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-700 transition">Run 100 Customer Decisions</button>
+                                <button id="reset" class="w-full bg-slate-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-600 transition">Reset Simulation</button>
+                            </div>
+                            <div id="simStats" class="text-sm space-y-2">
+                                <p><strong>Total Customer Decisions:</strong> <span id="totalSteps">0</span></p>
+                                <p><strong>Current Epsilon:</strong> <span id="currentEpsilon">0.1</span></p>
+                            </div>
+                        </div>
+                        <div id="log" class="mt-4 p-4 h-48 bg-slate-800 text-white font-mono text-xs rounded-lg overflow-y-auto">
+                            <p class="text-slate-400">&gt; Simulation log waiting for input...</p>
+                        </div>
+                    </div>
+                </div>
+                 <div class="content-card p-6 mt-8">
+                    <h3 class="text-xl font-semibold mb-4 text-center">Policy Visualization for High-Risk Customers</h3>
+                    <p class="text-center text-slate-500 mb-4">This chart shows the learned Q-values for a specific high-risk customer state (Approved:High, Rejected:Yes, FS:High, Risk:High). After running the simulation, you'll see the agent's preferred action.</p>
+                    <div class="chart-container">
+                        <canvas id="policyChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- New: Cumulative Reward Over Time Chart -->
+                <div class="content-card p-6 mt-8">
+                    <h3 class="text-xl font-semibold mb-4 text-center">Cumulative Reward Over Time</h3>
+                    <p class="text-center text-slate-500 mb-4">This chart tracks the total reward accumulated by the agent, indicating learning progress. A rising trend suggests the agent is learning effectively.</p>
+                    <div class="chart-container">
+                        <canvas id="cumulativeRewardChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- New: Reward Outcome Distribution Chart -->
+                <div class="content-card p-6 mt-8">
+                    <h3 class="text-xl font-semibold mb-4 text-center">Reward Outcome Distribution</h3>
+                    <p class="text-center text-slate-500 mb-4">See the breakdown of different outcomes (True Positives, False Positives, etc.) over the simulation. This helps understand the agent's trade-offs.</p>
+                    <div class="chart-container">
+                        <canvas id="rewardDistributionChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- New: Customer Profile Examples -->
+                <div id="customerExamples" class="content-card p-6 mt-8">
+                    <h3 class="text-xl font-semibold mb-4 text-center">Explore Specific Customer Profiles</h3>
+                    <p class="text-center text-slate-500 mb-4">Click on a profile to see the agent's current learned Q-values and policy for that specific customer state, and how it compares to other profiles.</p>
+                    <div class="flex flex-wrap justify-center gap-4 mb-4">
+                        <button data-state="Appr:High,Rej:No,FS:Low,Risk:Low" class="customer-profile-btn bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">Good Customer</button>
+                        <button data-state="Appr:Low,Rej:Yes,FS:High,Risk:High" class="customer-profile-btn bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">Bad Customer</button>
+                        <button data-state="Appr:High,Rej:No,FS:Low,Risk:High" class="customer-profile-btn bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition">Borderline Customer</button>
+                    </div>
+                    <div id="customerProfileDetails" class="bg-slate-100 p-4 rounded-md text-sm text-slate-700">
+                        <p>Select a customer profile above to view its details.</p>
+                    </div>
+                </div>
+
+                <div id="simulationSummary" class="content-card p-6 mt-8">
+                    <h3 class="text-xl font-semibold mb-4 text-center">Agent's Learned Policy Summary</h3>
+                    <p class="text-slate-600">Run the simulation to see a summary of the agent's learned behavior and the main reasons for denying customers.</p>
+                </div>
+            </section>
+            
+            <hr class="my-12 border-slate-200">
+
+            <!-- Q-Learning in Fraud: Specific Considerations -->
+            <section id="fraud-specific-considerations" class="mb-16">
+                <h2 class="text-3xl font-bold text-slate-800 mb-8">Q-Learning in Fraud: Specific Considerations</h2>
+                <div class="content-card p-6">
+                    <h3 class="font-bold text-lg text-teal-700 mb-2">Specific to Fraud Detection</h3>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="font-semibold text-base mb-1">Pros in Fraud Detection:</h4>
+                            <ul class="list-disc list-inside text-sm">
+                                <li><strong class="font-semibold">Adaptability:</strong> Can learn and adapt to evolving fraud patterns without constant manual rule updates.</li>
+                                <li><strong class="font-semibold">Optimizes Business Metrics:</strong> Directly optimizes for financial outcomes (e.g., minimizing losses, balancing false positives/negatives) rather than just classification accuracy.</li>
+                                <li><strong class="font-semibold">Handles Sequential Decisions:</strong> Naturally fits the sequential nature of transaction monitoring and customer behavior over time.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-base mb-1">Cons in Fraud Detection:</h4>
+                            <ul class="list-disc list-inside text-sm">
+                                <li><strong class="font-semibold">State Space Complexity:</strong> Real-world customer/transaction data often leads to massive state spaces, requiring Deep Q-Networks (DQN) or other function approximators.</li>
+                                <li><strong class="font-semibold">Data Imbalance:</strong> Fraud is rare, leading to sparse reward signals, which can make learning very slow and challenging.</li>
+                                <li><strong class="font-semibold">Interpretability:</strong> A learned Q-table or neural network policy can be less transparent than traditional rule-based systems, making it harder to explain specific decisions to auditors or customers.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <hr class="my-12 border-slate-200">
+
+            <!-- Evaluation Metrics -->
+            <section id="evaluation" class="mb-16">
+                <h2 class="text-3xl font-bold text-slate-800 mb-8">Evaluating RL Performance in Fraud Detection</h2>
+                <p class="text-lg text-slate-600 mb-8">Beyond simply observing the Q-Table, evaluating a Reinforcement Learning agent's performance in a critical domain like fraud detection requires a deeper look at specific metrics that align with business objectives.</p>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="content-card p-6">
+                        <h3 class="font-bold text-lg text-teal-700 mb-2">Key Performance Indicators</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong class="font-semibold">Cumulative Reward:</strong> The total sum of rewards accumulated over time. A rising trend indicates the agent is learning to achieve its long-term goals.</li>
+                            <li><strong class="font-semibold">Average Reward per Step:</strong> The cumulative reward divided by the total number of steps. Provides a normalized view of performance.</li>
+                            <li><strong class="font-semibold">Reward Outcome Distribution:</strong> Breakdown of True Positives (fraud caught), True Negatives (legitimate approved), False Positives (legitimate denied), and False Negatives (fraud missed). Crucial for understanding trade-offs.</li>
+                            <li><strong class="font-semibold">Precision & Recall:</strong> Standard classification metrics adapted for RL decisions. Precision measures how many flagged cases were truly fraud. Recall measures how much actual fraud was caught.</li>
+                            <li><strong class="font-semibold">Financial Impact:</strong> Quantifying the actual monetary value of fraud averted vs. losses incurred from missed fraud or false positives. This is often the ultimate business metric.</li>
+                        </ul>
+                    </div>
+                    <div class="content-card p-6">
+                        <h3 class="font-bold text-lg text-teal-700 mb-2">Understanding Regret</h3>
+                        <p class="mb-2">Regret is a theoretical concept crucial for understanding how "optimal" an RL agent's learning is:</p>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong class="font-semibold">Definition:</strong> Regret is the difference between the cumulative reward obtained by the learning agent and the cumulative reward that could have been obtained by an *optimal* agent over the same period.</li>
+                            <li><strong class="font-semibold">Significance:</strong> It quantifies how much "worse" our agent performed compared to the best possible strategy. The goal of a good RL algorithm is to minimize regret over time, meaning its performance approaches that of the optimal policy.</li>
+                            <li><strong class="font-semibold">Challenge:</strong> In real-world scenarios, the true optimal policy is often unknown, making direct calculation of regret difficult. However, it serves as a guiding principle for algorithm design and theoretical analysis.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <hr class="my-12 border-slate-200">
+
+            <!-- Challenges of Deploying RL in Production (for Fraud) -->
+            <section id="deployment-challenges" class="mb-16">
+                <h2 class="text-3xl font-bold text-slate-800 mb-8">Challenges of Deploying RL in Production (for Fraud)</h2>
+                <p class="text-lg text-slate-600 mb-8">Deploying Reinforcement Learning models, especially in high-stakes domains like fraud detection, comes with unique challenges beyond typical supervised learning models.</p>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="content-card p-6">
+                        <h3 class="font-bold text-lg text-teal-700 mb-2">Key Challenges</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong class="font-semibold">Online vs. Offline Learning:</strong> Real-time environments require online learning, which can be unstable. Offline learning from historical data might not capture dynamic fraud patterns.</li>
+                            <li><strong class="font-semibold">Concept Drift:</strong> Fraudsters constantly evolve their tactics, causing "concept drift." RL agents must continuously adapt without explicit retraining, which is hard.</li>
+                            <li><strong class="font-semibold">Interpretability & Explainability:</strong> Complex RL models (especially Deep RL) are often "black boxes." Explaining why a customer was denied to regulators or customers is crucial but difficult.</li>
+                            <li><strong class="font-semibold">Safety & Robustness:</strong> In critical systems, ensuring the agent doesn't learn harmful (e.g., denying too many legitimate customers) or unstable behaviors is paramount.</li>
+                            <li><strong class="font-semibold">Sparse & Delayed Rewards:</strong> Fraud events are rare, leading to very few positive reward signals. Rewards might also be delayed (e.g., fraud discovered weeks later), making credit assignment difficult.</li>
+                            <li><strong class="font-semibold">Exploration in Production:</strong> Allowing an agent to "explore" (take random actions) in a live fraud system can be risky and costly.</li>
+                        </ul>
+                    </div>
+                    <div class="content-card p-6">
+                        <h3 class="font-bold text-lg text-teal-700 mb-2">Mitigation Strategies</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong class="font-semibold">Simulation Environments:</strong> Extensive training and testing in realistic, high-fidelity simulations before live deployment.</li>
+                            <li><strong class="font-semibold">Safe Exploration Techniques:</strong> Using constrained exploration, pre-trained policies, or human-guided exploration in live systems.</li>
+                            <li><strong class="font-semibold">Hybrid Models:</strong> Combining RL with traditional supervised learning or rule-based systems to leverage strengths and mitigate weaknesses.</li>
+                            <li><strong class="font-semibold">Explainable AI (XAI) Tools:</strong> Employing techniques like LIME or SHAP to gain insights into model decisions, even for complex neural networks.</li>
+                            <li><strong class="font-semibold">Robust Reward Engineering:</strong> Carefully crafting reward functions that align with business objectives and account for various costs (financial loss, customer churn, operational overhead).</li>
+                            <li><strong class="font-semibold">Continuous Monitoring & Human Oversight:</strong> Implementing strong monitoring systems and human-in-the-loop processes for intervention and feedback.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <hr class="my-12 border-slate-200">
+
+            <!-- Comparison -->
+            <section id="comparison" class="mb-16">
+                <h2 class="text-3xl font-bold text-slate-800 mb-8">Algorithm Comparison</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr>
+                                <th class="p-3 font-bold uppercase bg-slate-100 text-slate-600 border border-slate-300">Algorithm</th>
+                                <th class="p-3 font-bold uppercase bg-slate-100 text-slate-600 border border-slate-300">Key Idea</th>
+                                <th class="p-3 font-bold uppercase bg-slate-100 text-slate-600 border border-slate-300">Policy Type</th>
+                                <th class="p-3 font-bold uppercase bg-slate-100 text-slate-600 border border-slate-300">Best For</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white">
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-3 font-semibold border border-slate-200">Q-Learning</td>
+                                <td class="p-3 border border-slate-200">Learns value of actions by assuming future actions will be optimal.</td>
+                                <td class="p-3 border border-slate-200">Off-Policy</td>
+                                <td class="p-3 border border-slate-200">Simple, discrete environments where exploration is safe.</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-3 border border-slate-200">SARSA</td>
+                                <td class="p-3 border border-slate-200">Learns value of actions based on the action actually taken.</td>
+                                <td class="p-3 border border-slate-200">On-Policy</td>
+                                <td class="p-3 border border-slate-200">Tasks where avoiding sub-optimal exploration is critical (e.g., robotics).</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-3 border border-slate-200">Deep Q-Network (DQN)</td>
+                                <td class="p-3 border border-slate-200">Uses a neural network to approximate Q-values, handling vast state spaces.</td>
+                                <td class="p-3 border border-slate-200">Off-Policy</td>
+                                <td class="p-3 border border-slate-200">High-dimensional states like images from video games.</td>
+                            </tr>
+                             <tr class="hover:bg-slate-50">
+                                <td class="p-3 border border-slate-200">Policy Gradient</td>
+                                <td class="p-3 border border-slate-200">Directly learns the policy function that maps states to actions.</td>
+                                <td class="p-3 border border-slate-200">On/Off-Policy</td>
+                                <td class="p-3 border border-slate-200">Environments with continuous action spaces.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <hr class="my-12 border-slate-200">
+
+            <!-- Deep Q-Networks (DQN) -->
+            <section id="dqn" class="mb-16">
+                <h2 class="text-3xl font-bold text-slate-800 mb-8">Deep Q-Networks (DQN)</h2>
+                <p class="text-lg text-slate-600 mb-8">While traditional Q-Learning uses a simple table to store Q-values, this approach quickly becomes unfeasible for real-world problems with vast or continuous state spaces. Deep Q-Networks (DQN) address this "curse of dimensionality" by replacing the Q-table with a deep neural network.</p>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="content-card p-6">
+                        <h3 class="font-bold text-lg text-teal-700 mb-2">How DQN Works</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong class="font-semibold">Neural Network as Q-Function:</strong> Instead of a table, a neural network takes the state as input and outputs the Q-values for all possible actions. This allows generalization to unseen states.</li>
+                            <li><strong class="font-semibold">Experience Replay:</strong> Past (state, action, reward, next_state) transitions are stored in a "replay buffer." The network is trained on random mini-batches from this buffer, breaking correlations in sequential data and improving stability.</li>
+                            <li><strong class="font-semibold">Target Network:</strong> A separate, "target" neural network is used to calculate the target Q-values in the Bellman equation. This target network is updated less frequently than the main network, providing a stable target for learning and preventing oscillations.</li>
+                        </ul>
+                    </div>
+                    <div class="content-card p-6">
+                        <h3 class="font-bold text-lg text-teal-700 mb-2">Why DQN is Crucial for Fraud</h3>
+                        <p class="mb-2">For real-world fraud detection, DQN's ability to handle complex, high-dimensional data is vital:</p>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong class="font-semibold">Scalability:</strong> Can process thousands of features and complex customer profiles that would overwhelm a tabular Q-table.</li>
+                            <li><strong class="font-semibold">Feature Learning:</strong> Deep networks can automatically learn relevant features from raw data, reducing the need for extensive manual feature engineering.</li>
+                            <li><strong class="font-semibold">Generalization:</strong> Can generalize to new, unseen fraud patterns or customer behaviors, which is crucial as fraudsters constantly adapt.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <hr class="my-12 border-slate-200">
+
+            <!-- Hybrid Approaches & Human-in-the-Loop -->
+            <section id="hybrid-approaches" class="mb-16">
+                <h2 class="text-3xl font-bold text-slate-800 mb-8">Hybrid Approaches & Human-in-the-Loop</h2>
+                <p class="text-lg text-slate-600 mb-8">Pure Reinforcement Learning can be powerful, but in sensitive domains like fraud detection, combining it with other techniques and human oversight often yields the most robust and trustworthy systems.</p>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="content-card p-6">
+                        <h3 class="font-bold text-lg text-teal-700 mb-2">Combining RL with Other ML</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong class="font-semibold">Supervised Learning Pre-filters:</strong> A traditional classification model (e.g., XGBoost, Random Forest) can first filter out obvious legitimate or fraudulent cases, leaving a smaller, more ambiguous set for the RL agent to make fine-grained decisions.</li>
+                            <li><strong class="font-semibold">Feature Engineering:</strong> Supervised learning techniques can be used to generate rich features that serve as better "states" for the RL agent.</li>
+                            <li><strong class="font-semibold">Anomaly Detection:</strong> Unsupervised anomaly detection models can flag highly unusual patterns, which then become a feature in the RL state or trigger a specific RL policy.</li>
+                        </ul>
+                    </div>
+                    <div class="content-card p-6">
+                        <h3 class="font-bold text-lg text-teal-700 mb-2">Human-in-the-Loop (HITL)</h3>
+                        <p class="mb-2">Human experts remain indispensable in complex fraud detection systems:</p>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong class="font-semibold">Feedback & Labeling:</strong> Human analysts provide critical feedback (e.g., confirming fraud or false positives) that serves as the reward signal for the RL agent.</li>
+                            <li><strong class="font-semibold">Uncertainty Handling:</strong> When the RL agent's confidence is low, or the decision is high-stakes, it can "defer" to a human analyst for review.</li>
+                            <li><strong class="font-semibold">Policy Override:</strong> Humans can override automated decisions in exceptional circumstances, providing a safety net.</li>
+                            <li><strong class="font-semibold">Learning from Human Actions:</strong> The RL agent can also learn by observing and mimicking the decisions made by human experts.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <hr class="my-12 border-slate-200">
+            
+            <!-- Cases -->
+            <section id="cases" class="mb-16">
+                 <h2 class="text-3xl font-bold text-slate-800 mb-8">Real-World Applications</h2>
+                 <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                     <div class="content-card p-6"><h3 class="font-bold text-lg text-teal-700 mb-2">Gaming AI</h3><p>Achieving superhuman performance in complex games like Atari with <a href="https://deepmind.google/discover/blog/deep-reinforcement-learning/" target="_blank" class="text-blue-600 hover:underline">Deep Q-Networks (DQN)</a>.</p></div>
+                     <div class="content-card p-6"><h3 class="font-bold text-lg text-teal-700 mb-2">Robotics</h3><p>Training robots for complex manipulation tasks like grasping with <a href="https://www.researchgate.net/publication/326029397_QT-Opt_Scalable_Deep_Reinforcement_Learning_for_Vision-Based_Robotic_Manipulation" target="_blank" class="text-blue-600 hover:underline">Google Brain's QT-Opt</a>.</p></div>
+                     <div class="content-card p-6"><h3 class="font-bold text-lg text-teal-700 mb-2">Finance</h3><p>Developing adaptive algorithmic trading strategies and optimizing investment portfolios (e.g., <a href="https://neptune.ai/blog/7-applications-of-reinforcement-learning-in-finance-and-trading" target="_blank" class="text-blue-600 hover:underline">Stock Trading Bots</a>).</p></div>
+                     <div class="content-card p-6"><h3 class="font-bold text-lg text-teal-700 mb-2">Resource Management</h3><p>Optimizing energy consumption in data centers with <a href="https://deepmind.google/discover/blog/safety-first-ai-for-autonomous-data-centre-cooling-and-industrial-control/" target="_blank" class="text-blue-600 hover:underline">Google DeepMind's AI</a>.</p></div>
+                     <div class="content-card p-6"><h3 class="font-bold text-lg text-teal-700 mb-2">Recommendation Engines</h3><p>Personalizing content on platforms like Netflix by focusing on long-term user engagement (e.g., <a href="https://netflixtechblog.com/foundation-model-for-personalized-recommendation-1a0bd8e02d39" target="_blank" class="text-blue-600 hover:underline">Netflix's RL-driven systems</a>).</p></div>
+                     <div class="content-card p-6"><h3 class="font-bold text-lg text-teal-700 mb-2">Healthcare</h3><p>Assisting in dynamic treatment plans like chemotherapy optimization (<a href="https://www.researchgate.net/publication/389137789_Reinforcement_Learning_in_Healthcare_Optimizing_Treatment_Strategies_Dynamic_Resource_Allocation_and_Adaptive_Clinical_Decision-Making" target="_blank" class="text-blue-600 hover:underline">RL-based DTRs</a>).</p></div>
+                     <div class="content-card p-6"><h3 class="font-bold text-lg text-teal-700 mb-2">Manufacturing</h3><p>Optimizing industrial processes and predictive maintenance (e.g., <a href="https://www.odinschool.com/blog/top-100-reinforcement-learning-real-life-examples-and-its-challenges" target="_blank" class="text-blue-600 hover:underline">Siemens Industrial Automation</a>).</p></div>
+                     <div class="content-card p-6"><h3 class="font-bold text-lg text-teal-700 mb-2">Fraud Prevention</h3><p>Real-time credit card fraud detection using Deep Q-Networks (DQN) to adapt to evolving fraud patterns and optimize for financial loss prevention. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11065415/" target="_blank" class="text-blue-600 hover:underline">Example Research</a>.</p></div>
+                 </div>
+            </section>
+
+        </main>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    // --- Hyperparameter Sliders ---
+    const sliders = [
+        { id: 'alpha', valueId: 'alphaValue', descId: 'alphaDescription', descriptions: ['agent learns nothing', 'agent learns slowly, trusting old information more', 'balanced learning', 'agent learns quickly, trusting new information more', 'agent only considers the most recent information'] },
+        { id: 'gamma', valueId: 'gammaValue', descId: 'gammaDescription', descriptions: ['agent is myopic (only considers immediate rewards)', 'agent slightly values future rewards', 'balanced view of short and long-term rewards', 'agent strongly values future rewards', 'agent prioritizes long-term rewards almost exclusively'] },
+        { id: 'epsilon', valueId: 'epsilonValue', descId: 'epsilonDescription', descriptions: ['agent only exploits (never explores)', 'agent explores infrequently', 'balanced exploration-exploitation', 'agent explores frequently', 'agent only explores (never exploits)'] }
+    ];
+
+    sliders.forEach(sliderConfig => {
+        const slider = document.getElementById(sliderConfig.id);
+        const valueDisplay = document.getElementById(sliderConfig.valueId);
+        const descDisplay = document.getElementById(sliderConfig.descId);
+        
+        slider.addEventListener('input', () => {
+            const value = parseFloat(slider.value);
+            valueDisplay.textContent = value.toFixed(1);
+            let descIndex = Math.round(value * (sliderConfig.descriptions.length - 1));
+            descDisplay.textContent = sliderConfig.descriptions[descIndex];
+        });
+        slider.dispatchEvent(new Event('input')); // Initial setup
+    });
+
+    // --- Navigation ---
+    const sections = document.querySelectorAll('section');
+    const navLinks = document.querySelectorAll('.nav-link');
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                navLinks.forEach(link => {
+                    link.classList.toggle('active', link.getAttribute('href').substring(1) === entry.target.id);
+                });
+            }
+        });
+    }, { rootMargin: '-50% 0px -50% 0px', threshold: 0 });
+
+    sections.forEach(section => observer.observe(section));
+
+    // --- Simulation Logic ---
+    const states = [
+        "Appr:Low,Rej:No,FS:Low,Risk:Low",
+        "Appr:Low,Rej:No,FS:Low,Risk:High",
+        "Appr:Low,Rej:No,FS:High,Risk:Low",
+        "Appr:Low,Rej:No,FS:High,Risk:High",
+        "Appr:Low,Rej:Yes,FS:Low,Risk:Low",
+        "Appr:Low,Rej:Yes,FS:Low,Risk:High",
+        "Appr:Low,Rej:Yes,FS:High,Risk:Low",
+        "Appr:Low,Rej:Yes,FS:High,Risk:High",
+
+        "Appr:High,Rej:No,FS:Low,Risk:Low",
+        "Appr:High,Rej:No,FS:High,Risk:Low",
+        "Appr:High,Rej:No,FS:High,Risk:High",
+        "Appr:High,Rej:Yes,FS:Low,Risk:Low",
+        "Appr:High,Rej:Yes,FS:Low,Risk:High",
+        "Appr:High,Rej:Yes,FS:High,Risk:Low",
+        "Appr:High,Rej:Yes,FS:High,Risk:High",
+        "Appr:High,Rej:No,FS:Low,Risk:High" // Moved to end to keep high-risk together
+    ].sort(); // Sort to ensure consistent order for Q-table display
+
+    const actions = ["Approve_Customer_Next_Day", "Deny_Customer_Next_Day"];
+    
+    let Q = {};
+    let alpha = 0.1;
+    let gamma = 0.1; // Default to 0.1 as requested
+    let epsilon = 0.1; // Default to 0.1 as requested
+    let epsilonDecay = 0.0005; 
+    let minEpsilon = 0.01;
+    let totalSteps = 0;
+    let currentCumulativeReward = 0;
+    let cumulativeRewardsData = [];
+    let rewardOutcomeCounts = {
+        'True Positive (Fraud Prevented!)': 0,
+        'True Negative': 0,
+        'False Positive (Legitimate Customer Denied!)': 0,
+        'False Negative (Fraud Allowed!)': 0
+    };
+    
+    const logEl = document.getElementById('log');
+    const qTableBody = document.getElementById('qTable').querySelector('tbody');
+    const totalStepsEl = document.getElementById('totalSteps');
+    const currentEpsilonEl = document.getElementById('currentEpsilon');
+    const simulationSummaryEl = document.getElementById('simulationSummary');
+
+    const runStepBtn = document.getElementById('runStep');
+    const run100Btn = document.getElementById('run100'); // Fixed typo
+    const resetBtn = document.getElementById('reset');
+    
+    let policyChart;
+    let cumulativeRewardChart;
+    let rewardDistributionChart;
+
+    function getPolicy(state) {
+        // Handle cases where Q[state] might not be initialized yet (though it should be)
+        if (!Q[state] || Object.keys(Q[state]).length === 0) {
+            return actions[0]; // Default to first action if Q-values are not ready
+        }
+        return Q[state][actions[0]] > Q[state][actions[1]] ? actions[0] : actions[1];
+    }
+
+    function provideSimulationSummary() {
+        let summaryText = `
+            <h3 class="text-xl font-semibold mb-4 text-center">Agent's Learned Policy Summary</h3>
+            <p class="text-slate-600 mb-4">After ${totalSteps} customer decisions, the agent has learned to adjust its policy for approving or denying customers for the next day. Here's what the final learned policy, reflected in the Q-Table, suggests:</p>
+            <ul class="list-disc list-inside text-slate-600 space-y-2">
+        `;
+        let deniedStatesCount = 0;
+        let approvedStatesCount = 0;
+        let commonDenialFactors = {
+            'FS:High': 0,
+            'Rej:Yes': 0,
+            'Risk:High': 0
+        };
+        let commonApprovalFactors = {
+            'FS:Low': 0,
+            'Rej:No': 0,
+            'Risk:Low': 0
+        };
+
+        states.forEach(state => {
+            const approveQ = Q[state][actions[0]];
+            const denyQ = Q[state][actions[1]];
+            
+            if (denyQ > approveQ) {
+                deniedStatesCount++;
+                summaryText += `<li class="text-red-600">For customers with state: <span class="font-mono">${state}</span>, the agent tends to <strong class="font-bold">DENY</strong> activity for the next day.</li>`;
+                if (state.includes("FS:High")) commonDenialFactors['FS:High']++;
+                if (state.includes("Rej:Yes")) commonDenialFactors['Rej:Yes']++;
+                if (state.includes("Risk:High")) commonDenialFactors['Risk:High']++;
+            } else {
+                approvedStatesCount++;
+                summaryText += `<li class="text-green-600">For customers with state: <span class="font-mono">${state}</span>, the agent tends to <strong class="font-bold">APPROVE</strong> activity for the next day.</li>`;
+                if (state.includes("FS:Low")) commonApprovalFactors['FS:Low']++;
+                if (state.includes("Rej:No")) commonApprovalFactors['Rej:No']++;
+                if (state.includes("Risk:Low")) commonApprovalFactors['Risk:Low']++;
+            }
+        });
+
+        summaryText += `</ul><p class="text-slate-600 mt-4">Based on the simulation, the main reasons the agent tends to <strong class="text-red-600">deny customers</strong> from continuing their activity are typically associated with:</p><ul class="list-disc list-inside text-slate-600">`;
+        if (commonDenialFactors['FS:High'] > 0) summaryText += `<li><strong class="font-semibold">High Fraud Score (FS:High):</strong> This is a strong indicator for denial, as it suggests a history or high likelihood of fraudulent activity.</li>`;
+        if (commonDenialFactors['Rej:Yes'] > 0) summaryText += `<li><strong class="font-semibold">Presence of Rejected Transactions (Rej:Yes):</strong> Customers with previous rejected transactions are often flagged for denial, indicating past suspicious behavior.</li>`;
+        if (commonDenialFactors['Risk:High'] > 0) summaryText += `<li><strong class="font-semibold">High Customer Risk Score (Risk:High):</strong> An elevated overall risk assessment of the customer significantly contributes to the decision to deny.</li>`;
+        
+        if (deniedStatesCount === 0) {
+            summaryText += `<li>No specific denial patterns observed yet. The agent is currently approving all customers or has not learned strong denial policies. Run more steps!</li>`;
+        }
+        summaryText += `</ul><p class="text-slate-600 mt-4">Conversely, customers with <strong class="text-green-600">low fraud scores, no rejected transactions, and low risk scores</strong> are generally approved, as they represent legitimate and valuable business.</p><p class="text-slate-600 mt-4">The agent's learning process aims to optimize for financial gain (preventing fraud) while minimizing negative customer impact (false positives).</p>`;
+        
+        // Add average reward per step to summary
+        const averageReward = totalSteps > 0 ? (currentCumulativeReward / totalSteps).toFixed(3) : 0;
+        summaryText += `<p class="text-slate-600 mt-4"><strong>Average Reward per Customer Decision:</strong> ${averageReward}</p>`;
+
+        // Add regret discussion to summary
+        summaryText += `<p class="text-slate-600 mt-4"><strong>Regret in Simulation:</strong> While calculating true regret against a perfect optimal policy is complex in real-world scenarios, in this simulation, the agent's learning aims to minimize the difference between its accumulated reward and the best possible reward for each step. As the cumulative reward graph rises and the policy stabilizes, the agent is implicitly reducing its regret.</p>`;
+
+        simulationSummaryEl.innerHTML = summaryText;
+    }
+
+    function initializeSimulation() {
+        Q = {};
+        states.forEach(state => {
+            Q[state] = {};
+            actions.forEach(action => {
+                Q[state][action] = 0;
+            });
+        });
+        totalSteps = 0;
+        currentCumulativeReward = 0;
+        cumulativeRewardsData = [];
+        rewardOutcomeCounts = {
+            'True Positive (Fraud Prevented!)': 0,
+            'True Negative': 0,
+            'False Positive (Legitimate Customer Denied!)': 0,
+            'False Negative (Fraud Allowed!)': 0
+        };
+
+        // Initialize hyperparameters from HTML values
+        epsilon = parseFloat(document.getElementById('epsilon').value);
+        alpha = parseFloat(document.getElementById('alpha').value);
+        gamma = parseFloat(document.getElementById('gamma').value);
+
+        logEl.innerHTML = '<p class="text-slate-400">&gt; Simulation reset. Ready.</p>';
+        updateUI();
+        createOrUpdatePolicyChart();
+        createOrUpdateCumulativeRewardChart();
+        createOrUpdateRewardDistributionChart();
+        document.getElementById('customerProfileDetails').innerHTML = '<p>Select a customer profile above to view its details.</p>';
+        provideSimulationSummary(); // Call summary on init
+    }
+    
+    function updateUI() {
+        qTableBody.innerHTML = '';
+        states.forEach(state => {
+            const row = document.createElement('tr');
+            row.id = `row-${state.replace(/[^a-zA-Z0-9]/g, '-')}`; // Sanitize ID for HTML
+            
+            const policy = getPolicy(state);
+            const policyColor = policy === 'Approve_Customer_Next_Day' ? 'text-green-600' : 'text-red-600';
+
+            row.innerHTML = `
+                <td class="font-mono">${state}</td>
+                <td>${Q[state][actions[0]].toFixed(3)}</td>
+                <td>${Q[state][actions[1]].toFixed(3)}</td>
+                <td class="font-semibold ${policyColor}">${policy.replace(/_/g, ' ')}</td>
+            `;
+            qTableBody.appendChild(row);
+        });
+        totalStepsEl.textContent = totalSteps;
+        currentEpsilonEl.textContent = epsilon.toFixed(3);
+    }
+    
+    function logMessage(message, type = 'info') {
+        const p = document.createElement('p');
+        p.textContent = `> ${message}`;
+        if (type === 'reward') p.classList.add('text-yellow-300');
+        if (type === 'action') p.classList.add('text-sky-300');
+        logEl.appendChild(p);
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function chooseAction(state) {
+        if (Math.random() < epsilon) {
+            logMessage(`Exploring...`, 'action');
+            return actions[Math.floor(Math.random() * actions.length)];
+        } else {
+            logMessage(`Exploiting...`, 'action');
+            return getPolicy(state);
+        }
+    }
+
+    function getReward(state, action) {
+        // A customer is truly fraudulent if FS:High AND (Rej:Yes OR Risk:High)
+        const isTrulyFraudulent = (state.includes("FS:High") && (state.includes("Rej:Yes") || state.includes("Risk:High")));
+        const denyAction = action === "Deny_Customer_Next_Day";
+        
+        let rewardInfo;
+        if (isTrulyFraudulent && denyAction) rewardInfo = { reward: 200, outcome: "True Positive (Fraud Prevented!)" }; // Prevented fraud
+        else if (isTrulyFraudulent && !denyAction) rewardInfo = { reward: -500, outcome: "False Negative (Fraud Allowed!)" }; // Allowed fraud
+        else if (!isTrulyFraudulent && denyAction) rewardInfo = { reward: -100, outcome: "False Positive (Legitimate Customer Denied!)" }; // Lost legitimate business
+        else rewardInfo = { reward: 10, outcome: "True Negative" }; // Continued legitimate business
+
+        rewardOutcomeCounts[rewardInfo.outcome]++;
+        return rewardInfo;
+    }
+
+    function runSimulationStep() {
+        alpha = parseFloat(document.getElementById('alpha').value);
+        gamma = parseFloat(document.getElementById('gamma').value);
+        
+        const state = states[Math.floor(Math.random() * states.length)];
+        logMessage(`New customer decision for state: ${state}`);
+        
+        const action = chooseAction(state);
+        logMessage(`Agent chose action: ${action.replace(/_/g, ' ')}`, 'action');
+        
+        const { reward, outcome } = getReward(state, action);
+        logMessage(`Outcome: ${outcome}. Reward: ${reward}`, 'reward');
+        
+        // In this simple model, we assume the next state is independent for the purpose of Q-update.
+        // For a true sequential customer model, the next state would depend on current action and outcome.
+        const nextState = states[Math.floor(Math.random() * states.length)]; // Random next state for TD target
+        const maxNextQ = Math.max(...Object.values(Q[nextState]));
+        
+        const oldQ = Q[state][action];
+        const temporalDifference = reward + gamma * maxNextQ - oldQ;
+        Q[state][action] = oldQ + alpha * temporalDifference;
+        
+        totalSteps++;
+        currentCumulativeReward += reward;
+        cumulativeRewardsData.push({ x: totalSteps, y: currentCumulativeReward });
+
+        if (epsilon > minEpsilon) {
+            epsilon -= epsilonDecay;
+        }
+
+        updateUI();
+        const row = document.getElementById(`row-${state.replace(/[^a-zA-Z0-9]/g, '-')}`);
+        if(row) {
+            row.classList.add('highlight-update');
+            setTimeout(() => row.classList.remove('highlight-update'), 700);
+        }
+    }
+
+    function createOrUpdatePolicyChart() {
+        const ctx = document.getElementById('policyChart').getContext('2d');
+        // Focusing on a high-risk state for visualization
+        const highRiskStateForChart = "Appr:High,Rej:Yes,FS:High,Risk:High"; 
+        const chartData = {
+            labels: ['Approve Customer', 'Deny Customer'],
+            datasets: [{
+                label: `Q-Values for State ${highRiskStateForChart}`,
+                data: [Q[highRiskStateForChart]['Approve_Customer_Next_Day'], Q[highRiskStateForChart]['Deny_Customer_Next_Day']],
+                backgroundColor: ['rgba(34, 197, 94, 0.6)', 'rgba(239, 68, 68, 0.6)'],
+                borderColor: ['rgb(22, 163, 74)', 'rgb(220, 38, 38)'],
+                borderWidth: 1
+            }]
+        };
+
+        if(policyChart) {
+            policyChart.data = chartData;
+            policyChart.update();
+        } else {
+            policyChart = new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: false }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: `Policy for State: ${highRiskStateForChart}` }
+                    }
+                }
+            });
+        }
+    }
+
+    function createOrUpdateCumulativeRewardChart() {
+        const ctx = document.getElementById('cumulativeRewardChart').getContext('2d');
+        const chartData = {
+            labels: cumulativeRewardsData.map(d => d.x),
+            datasets: [{
+                label: 'Cumulative Reward',
+                data: cumulativeRewardsData.map(d => d.y),
+                borderColor: 'rgb(13, 148, 136)', // teal-600
+                backgroundColor: 'rgba(13, 148, 136, 0.2)',
+                tension: 0.1,
+                fill: true
+            }]
+        };
+
+        if (cumulativeRewardChart) {
+            cumulativeRewardChart.data = chartData;
+            cumulativeRewardChart.update();
+        } else {
+            cumulativeRewardChart = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Customer Decisions (Steps)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Cumulative Reward'
+                            },
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: 'Agent\'s Cumulative Reward Over Time' }
+                    }
+                }
+            });
+        }
+    }
+
+    function createOrUpdateRewardDistributionChart() {
+        const ctx = document.getElementById('rewardDistributionChart').getContext('2d');
+        const labels = Object.keys(rewardOutcomeCounts);
+        const data = Object.values(rewardOutcomeCounts);
+        const backgroundColors = [
+            'rgba(34, 197, 94, 0.6)',   // True Positive (green)
+            'rgba(59, 130, 246, 0.6)',  // True Negative (blue)
+            'rgba(239, 68, 68, 0.6)',   // False Positive (red)
+            'rgba(251, 191, 36, 0.6)'   // False Negative (yellow)
+        ];
+        const borderColors = [
+            'rgb(22, 163, 74)',
+            'rgb(37, 99, 235)',
+            'rgb(220, 38, 38)',
+            'rgb(217, 119, 6)'
+        ];
+
+        const chartData = {
+            labels: labels.map(label => {
+                // Wrap labels if too long
+                const words = label.split(' ');
+                let lines = [];
+                let currentLine = '';
+                words.forEach(word => {
+                    if ((currentLine + word).length < 16) { // Approx 16 chars per line
+                        currentLine += (currentLine ? ' ' : '') + word;
+                    } else {
+                        lines.push(currentLine);
+                        currentLine = word;
+                    }
+                });
+                lines.push(currentLine);
+                return lines;
+            }),
+            datasets: [{
+                label: 'Number of Occurrences',
+                data: data,
+                backgroundColor: backgroundColors,
+                borderColor: borderColors,
+                borderWidth: 1
+            }]
+        };
+
+        if (rewardDistributionChart) {
+            rewardDistributionChart.data = chartData;
+            rewardDistributionChart.update();
+        } else {
+            rewardDistributionChart = new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Count'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: 'Distribution of Reward Outcomes' }
+                    }
+                }
+            });
+        }
+    }
+
+    function displayCustomerProfile(state) {
+        const approveQ = Q[state][actions[0]].toFixed(3);
+        const denyQ = Q[state][actions[1]].toFixed(3);
+        const policy = getPolicy(state).replace(/_/g, ' ');
+        const policyColor = policy.includes('Approve') ? 'text-green-600' : 'text-red-600';
+
+        document.getElementById('customerProfileDetails').innerHTML = `
+            <p class="mb-2"><strong>Customer State:</strong> <span class="font-mono">${state}</span></p>
+            <p class="mb-2"><strong>Q(Approve Customer):</strong> ${approveQ}</p>
+            <p class="mb-2"><strong>Q(Deny Customer):</strong> ${denyQ}</p>
+            <p class="mb-2"><strong>Agent's Current Policy:</strong> <span class="font-semibold ${policyColor}">${policy}</span></p>
+            <p class="text-sm text-slate-500 mt-4">This shows the agent's current learned value for approving or denying this specific customer profile. Run more simulation steps to see how these values might change!</p>
+        `;
+        // Removed: rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const rowId = `row-${state.replace(/[^a-zA-Z0-9]/g, '-')}`;
+        const rowElement = document.getElementById(rowId);
+        if (rowElement) {
+            rowElement.classList.add('highlight-update');
+            setTimeout(() => rowElement.classList.remove('highlight-update'), 700);
+        }
+    }
+
+    // Event listeners for customer profile buttons
+    document.querySelectorAll('.customer-profile-btn').forEach(button => {
+        button.addEventListener('click', (event) => {
+            const stateToDisplay = event.target.dataset.state;
+            displayCustomerProfile(stateToDisplay);
+        });
+    });
+
+    runStepBtn.addEventListener('click', () => {
+        runSimulationStep();
+        createOrUpdatePolicyChart();
+        createOrUpdateCumulativeRewardChart();
+        createOrUpdateRewardDistributionChart();
+        provideSimulationSummary(); // Update summary after each step
+    });
+    run100Btn.addEventListener('click', () => {
+        for(let i = 0; i < 100; i++) {
+            runSimulationStep();
+        }
+        createOrUpdatePolicyChart();
+        createOrUpdateCumulativeRewardChart();
+        createOrUpdateRewardDistributionChart();
+        provideSimulationSummary(); // Update summary after batch run
+    });
+    resetBtn.addEventListener('click', initializeSimulation);
+
+    // Initial load
+    initializeSimulation();
+});
+</script>
+<script type="text/javascript" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+</body>
+</html>
